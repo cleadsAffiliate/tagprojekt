@@ -397,27 +397,38 @@
                 // Prøv flere måder at finde grund ID på
                 let grundId = null;
 
-                // Metode 1: Fra jordstykke
+                // Metode 1: Fra jordstykke direkte (hvis id_lokalId findes)
                 if (adresseData.adgangsadresse?.jordstykke?.id_lokalId) {
                     grundId = adresseData.adgangsadresse.jordstykke.id_lokalId;
+                    console.log('✓ Grund ID fundet direkte:', grundId);
                 }
-                // Metode 2: Fra adgangsadresse direkte
-                else if (adresseData.adgangsadresse?.id) {
-                    // Brug adgangsadresse ID som backup
-                    const adgUrl = `${API_BASE_URL}/adgangsadresser/${adresseData.adgangsadresse.id}`;
-                    const adgResponse = await fetch(adgUrl, {
+                // Metode 2: Hent jordstykke data fra href
+                else if (adresseData.adgangsadresse?.jordstykke?.href) {
+                    console.log('Henter jordstykke data fra:', adresseData.adgangsadresse.jordstykke.href);
+
+                    const jordstykkeUrl = adresseData.adgangsadresse.jordstykke.href;
+                    const jordstykkeResponse = await fetch(jordstykkeUrl, {
                         headers: {
                             'Authorization': 'Basic ' + btoa(API_USERNAME + ':' + API_PASSWORD)
                         }
                     });
-                    if (adgResponse.ok) {
-                        const adgData = await adgResponse.json();
-                        console.log('Adgangsadresse data:', adgData);
-                        grundId = adgData.jordstykke?.id_lokalId;
+
+                    if (jordstykkeResponse.ok) {
+                        const jordstykkeData = await jordstykkeResponse.json();
+                        console.log('Jordstykke data:', jordstykkeData);
+
+                        // Prøv at finde id_lokalId i jordstykke data
+                        if (jordstykkeData.id_lokalId) {
+                            grundId = jordstykkeData.id_lokalId;
+                            console.log('✓ Grund ID fundet fra jordstykke:', grundId);
+                        } else if (jordstykkeData.id) {
+                            grundId = jordstykkeData.id;
+                            console.log('✓ Grund ID fundet som "id":', grundId);
+                        }
                     }
                 }
 
-                console.log('Grund ID:', grundId);
+                console.log('Endeligt Grund ID:', grundId);
 
                 if (!grundId) {
                     throw new Error('Grund ID ikke fundet');
