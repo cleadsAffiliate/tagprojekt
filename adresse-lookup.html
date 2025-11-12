@@ -430,11 +430,17 @@
 
                 console.log('Endeligt Grund ID:', grundId);
 
-                if (!grundId) {
-                    throw new Error('Grund ID ikke fundet');
+                // Fallback: Hvis vi ikke har grund ID, prøv med adgangsadresse ID
+                if (!grundId && adresseData.adgangsadresse?.id) {
+                    grundId = adresseData.adgangsadresse.id;
+                    console.log('⚠️ Bruger adgangsadresse ID som fallback:', grundId);
                 }
 
-                // Hent BBR data med grund ID
+                if (!grundId) {
+                    throw new Error('Hverken grund ID eller adgangsadresse ID kunne findes');
+                }
+
+                // Hent BBR data med grund ID (eller adgangsadresse ID)
                 const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Grund=${grundId}`;
                 console.log('BBR URL:', bbrUrl);
                 const bbrResponse = await fetch(bbrUrl);
