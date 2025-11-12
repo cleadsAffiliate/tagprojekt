@@ -418,11 +418,11 @@
 
                 console.log('\n=== PRØVER BBR API MED FORSKELLIGE PARAMETRE ===');
 
-                // 1. Prøv med BFEnr (BFE nummer fra jordstykke)
+                // 1. Prøv med BFEEjendomsnr (BFE nummer fra jordstykke)
                 if (jordstykkeData?.bfenummer && !bbrData) {
-                    console.log('\n🔍 Forsøg 1: BFEnr parameter');
+                    console.log('\n🔍 Forsøg 1: BFEEjendomsnr parameter');
                     console.log('BFE nummer:', jordstykkeData.bfenummer);
-                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&BFEnr=${jordstykkeData.bfenummer}`;
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&BFEEjendomsnr=${jordstykkeData.bfenummer}`;
                     console.log('URL:', bbrUrl);
 
                     try {
@@ -431,13 +431,13 @@
                             const data = await response.json();
                             if (Array.isArray(data) && data.length > 0) {
                                 bbrData = data;
-                                console.log('✅ SUCCESS med BFEnr! Fundet', data.length, 'bygning(er)');
+                                console.log('✅ SUCCESS med BFEEjendomsnr! Fundet', data.length, 'bygning(er)');
                             } else {
-                                console.log('❌ BFEnr returnerede tomt array');
+                                console.log('❌ BFEEjendomsnr returnerede tomt array');
                             }
                         }
                     } catch (error) {
-                        console.error('Fejl ved BFEnr:', error);
+                        console.error('Fejl ved BFEEjendomsnr:', error);
                     }
                 }
 
@@ -464,6 +464,29 @@
                     }
                 }
 
+                // 2b. Prøv med Ejendomsnummer uden præfiks
+                if (jordstykkeData?.bfenummer && !bbrData) {
+                    console.log('\n🔍 Forsøg 2b: Ejendomsnummer parameter');
+                    console.log('Ejendomsnummer:', jordstykkeData.bfenummer);
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Ejendomsnummer=${jordstykkeData.bfenummer}`;
+                    console.log('URL:', bbrUrl);
+
+                    try {
+                        const response = await fetch(bbrUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                bbrData = data;
+                                console.log('✅ SUCCESS med Ejendomsnummer! Fundet', data.length, 'bygning(er)');
+                            } else {
+                                console.log('❌ Ejendomsnummer returnerede tomt array');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Fejl ved Ejendomsnummer:', error);
+                    }
+                }
+
                 // 3. Prøv med HusnummerID (adgangsadresse ID)
                 if (adgangsadresseId && !bbrData) {
                     console.log('\n🔍 Forsøg 3: HusnummerID parameter');
@@ -487,12 +510,11 @@
                     }
                 }
 
-                // 4. Prøv med Matrikelnr + Ejerlavskode kombination
-                if (jordstykkeData?.matrikelnr && jordstykkeData?.ejerlav?.kode && !bbrData) {
-                    console.log('\n🔍 Forsøg 4: Matrikelnr + Ejerlavskode kombination');
-                    console.log('Matrikelnr:', jordstykkeData.matrikelnr);
-                    console.log('Ejerlavskode:', jordstykkeData.ejerlav.kode);
-                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Matrikelnr=${encodeURIComponent(jordstykkeData.matrikelnr)}&Ejerlavskode=${jordstykkeData.ejerlav.kode}`;
+                // 4. Prøv med adgangsadresse ID direkte som parameter
+                if (adgangsadresseId && !bbrData) {
+                    console.log('\n🔍 Forsøg 4: AdgangsadresseID parameter');
+                    console.log('Adgangsadresse ID:', adgangsadresseId);
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&AdgangsadresseID=${adgangsadresseId}`;
                     console.log('URL:', bbrUrl);
 
                     try {
@@ -501,13 +523,39 @@
                             const data = await response.json();
                             if (Array.isArray(data) && data.length > 0) {
                                 bbrData = data;
-                                console.log('✅ SUCCESS med Matrikelnr+Ejerlavskode! Fundet', data.length, 'bygning(er)');
+                                console.log('✅ SUCCESS med AdgangsadresseID! Fundet', data.length, 'bygning(er)');
                             } else {
-                                console.log('❌ Matrikelnr+Ejerlavskode returnerede tomt array');
+                                console.log('❌ AdgangsadresseID returnerede tomt array');
+                            }
+                        } else {
+                            const errorText = await response.text();
+                            console.log('❌ AdgangsadresseID fejl:', response.status, errorText);
+                        }
+                    } catch (error) {
+                        console.error('Fejl ved AdgangsadresseID:', error);
+                    }
+                }
+
+                // 5. Prøv med ESREjendomsnr hvis det findes
+                if (jordstykkeData?.esrejendomsnr && jordstykkeData.esrejendomsnr !== "0" && !bbrData) {
+                    console.log('\n🔍 Forsøg 5: ESREjendomsnr parameter');
+                    console.log('ESR Ejendomsnr:', jordstykkeData.esrejendomsnr);
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&ESREjendomsnr=${jordstykkeData.esrejendomsnr}`;
+                    console.log('URL:', bbrUrl);
+
+                    try {
+                        const response = await fetch(bbrUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                bbrData = data;
+                                console.log('✅ SUCCESS med ESREjendomsnr! Fundet', data.length, 'bygning(er)');
+                            } else {
+                                console.log('❌ ESREjendomsnr returnerede tomt array');
                             }
                         }
                     } catch (error) {
-                        console.error('Fejl ved Matrikelnr+Ejerlavskode:', error);
+                        console.error('Fejl ved ESREjendomsnr:', error);
                     }
                 }
 
