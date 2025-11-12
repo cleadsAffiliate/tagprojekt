@@ -371,20 +371,28 @@
 
         async function fetchBBRData(adresseId) {
             try {
+                console.log('=== START BBR DATA FETCH ===');
+                console.log('Adresse ID:', adresseId);
+
                 // Først hent adresse detaljer for at få grund ID
                 const adresseUrl = `${API_BASE_URL}/adresser/${adresseId}`;
+                console.log('Henter fra URL:', adresseUrl);
+
                 const adresseResponse = await fetch(adresseUrl, {
                     headers: {
                         'Authorization': 'Basic ' + btoa(API_USERNAME + ':' + API_PASSWORD)
                     }
                 });
 
+                console.log('Response status:', adresseResponse.status);
+
                 if (!adresseResponse.ok) {
-                    throw new Error('Kunne ikke hente adresse detaljer');
+                    console.error('Fejl response:', await adresseResponse.text());
+                    throw new Error(`Kunne ikke hente adresse detaljer (${adresseResponse.status})`);
                 }
 
                 const adresseData = await adresseResponse.json();
-                console.log('Adresse data:', adresseData);
+                console.log('Adresse data:', JSON.stringify(adresseData, null, 2));
 
                 // Prøv flere måder at finde grund ID på
                 let grundId = null;
@@ -455,9 +463,13 @@
                 boligArealEl.classList.remove('loading-text');
 
             } catch (error) {
-                console.error('Fejl ved hentning af BBR data:', error);
+                console.error('=== FEJL VED HENTNING AF BBR DATA ===');
+                console.error('Fejl type:', error.name);
+                console.error('Fejl besked:', error.message);
+                console.error('Fuld fejl:', error);
+
                 const boligArealEl = document.getElementById('boligareal');
-                boligArealEl.textContent = 'Kunne ikke hentes';
+                boligArealEl.textContent = 'Kunne ikke hentes (se console for detaljer)';
                 boligArealEl.classList.remove('loading-text');
             }
         }
