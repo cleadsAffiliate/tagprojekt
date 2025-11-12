@@ -70,7 +70,7 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
 
       try {
         const response = await fetch(
-          `http://localhost:3001/api/address/search?q=${encodeURIComponent(query)}&limit=10`
+          `/api/address/search?q=${encodeURIComponent(query)}&limit=10`
         );
 
         if (!response.ok) {

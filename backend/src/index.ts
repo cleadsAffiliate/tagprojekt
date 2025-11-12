@@ -6,7 +6,7 @@ import addressRoutes from './routes/address.routes';
 dotenv.config();
 
 const app: Express = express();
-const port = process.env.PORT || 3001;
+const port = Number(process.env.PORT) || 3001;
 
 // Middleware
 app.use(cors());
@@ -20,6 +20,6 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok' });
 });
 
-app.listen(port, () => {
-  console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`⚡️[server]: Server is running at http://0.0.0.0:${port}`);
 });
