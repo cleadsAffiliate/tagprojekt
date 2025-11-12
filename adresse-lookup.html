@@ -417,6 +417,35 @@
                 const adgangsadresseId = adresseData.adgangsadresse?.id;
 
                 console.log('\n=== PRØVER BBR API MED FORSKELLIGE PARAMETRE ===');
+                console.log('📍 Adgangsadresse fuld data:', JSON.stringify(adresseData.adgangsadresse, null, 2));
+
+                // 0. Prøv med Kommunekode + Vejkode + Husnr (mest direkte metode)
+                if (adresseData.adgangsadresse?.kommune?.kode && adresseData.adgangsadresse?.vejstykke?.kode && adresseData.adgangsadresse?.husnr && !bbrData) {
+                    console.log('\n🔍 Forsøg 0: Kommunekode + Vejkode + Husnr');
+                    console.log('Kommunekode:', adresseData.adgangsadresse.kommune.kode);
+                    console.log('Vejkode:', adresseData.adgangsadresse.vejstykke.kode);
+                    console.log('Husnr:', adresseData.adgangsadresse.husnr);
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Kommunekode=${adresseData.adgangsadresse.kommune.kode}&Vejkode=${adresseData.adgangsadresse.vejstykke.kode}&Husnr=${adresseData.adgangsadresse.husnr}`;
+                    console.log('URL:', bbrUrl);
+
+                    try {
+                        const response = await fetch(bbrUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                bbrData = data;
+                                console.log('✅ SUCCESS med Kommunekode+Vejkode+Husnr! Fundet', data.length, 'bygning(er)');
+                            } else {
+                                console.log('❌ Kommunekode+Vejkode+Husnr returnerede tomt array');
+                            }
+                        } else {
+                            const errorText = await response.text();
+                            console.log('❌ Fejl:', response.status, errorText);
+                        }
+                    } catch (error) {
+                        console.error('Fejl ved Kommunekode+Vejkode+Husnr:', error);
+                    }
+                }
 
                 // 1. Prøv med BFEEjendomsnr (BFE nummer fra jordstykke)
                 if (jordstykkeData?.bfenummer && !bbrData) {
@@ -559,6 +588,32 @@
                     }
                 }
 
+                // 6. Prøv /enhed endpoint i stedet for /bygning
+                if (adresseData.adgangsadresse?.kommune?.kode && adresseData.adgangsadresse?.vejstykke?.kode && adresseData.adgangsadresse?.husnr && !bbrData) {
+                    console.log('\n🔍 Forsøg 6: Enhed endpoint med Kommunekode+Vejkode+Husnr');
+                    const enhedUrl = `${BBR_BASE_URL}/enhed?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Kommunekode=${adresseData.adgangsadresse.kommune.kode}&Vejkode=${adresseData.adgangsadresse.vejstykke.kode}&Husnr=${adresseData.adgangsadresse.husnr}`;
+                    console.log('URL:', enhedUrl);
+
+                    try {
+                        const response = await fetch(enhedUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                // Enhed data har reference til bygning - hent bygning data
+                                console.log('✅ Fundet enhed data! Antal enheder:', data.length);
+                                console.log('Enhed data:', JSON.stringify(data[0], null, 2));
+
+                                // Brug enhed data direkte hvis den har areal info
+                                bbrData = data;
+                            } else {
+                                console.log('❌ Enhed endpoint returnerede tomt array');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Fejl ved enhed endpoint:', error);
+                    }
+                }
+
                 // Hvis ingen af metoderne virkede
                 if (!bbrData) {
                     console.error('\n❌ INGEN BBR DATA KUNNE HENTES MED NOGEN AF METODERNE');
@@ -572,18 +627,26 @@
                 // Find boligareal fra BBR data
                 let boligAreal = null;
 
-                for (const bygning of bbrData) {
-                    // BBR API returnerer felter med byg-præfix
-                    if (bygning.byg038SamletBygningsareal) {
-                        boligAreal = bygning.byg038SamletBygningsareal;
-                        console.log('✅ Fundet boligareal:', boligAreal, 'm²');
+                for (const item of bbrData) {
+                    // Prøv forskellige areal felter
+                    if (item.byg038SamletBygningsareal) {
+                        boligAreal = item.byg038SamletBygningsareal;
+                        console.log('✅ Fundet boligareal fra byg038SamletBygningsareal:', boligAreal, 'm²');
+                        break;
+                    } else if (item.enh020EnhedensAnvendelse || item.enh039Boligareal) {
+                        // Dette er enhed data
+                        boligAreal = item.enh039Boligareal || item.enh041SamletAreal;
+                        console.log('✅ Fundet boligareal fra enhed:', boligAreal, 'm²');
                         break;
                     }
                 }
 
                 if (!boligAreal) {
-                    console.warn('⚠️ BBR data fundet, men ingen byg038SamletBygningsareal felt');
-                    console.log('Tilgængelige felter i første bygning:', Object.keys(bbrData[0]));
+                    console.warn('⚠️ BBR data fundet, men ingen kendt areal felt');
+                    console.log('Tilgængelige felter i første element:', Object.keys(bbrData[0]));
+                    // Log alle felter der indeholder 'areal' eller 'Areal'
+                    const arealFelter = Object.keys(bbrData[0]).filter(key => key.toLowerCase().includes('areal'));
+                    console.log('Felter med "areal" i navnet:', arealFelter);
                 }
 
                 // Vis boligareal
