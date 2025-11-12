@@ -384,9 +384,32 @@
                 }
 
                 const adresseData = await adresseResponse.json();
+                console.log('Adresse data:', adresseData);
 
-                // Hent grund ID fra adresse data
-                const grundId = adresseData.adgangsadresse?.jordstykke?.id_lokalId;
+                // Prøv flere måder at finde grund ID på
+                let grundId = null;
+
+                // Metode 1: Fra jordstykke
+                if (adresseData.adgangsadresse?.jordstykke?.id_lokalId) {
+                    grundId = adresseData.adgangsadresse.jordstykke.id_lokalId;
+                }
+                // Metode 2: Fra adgangsadresse direkte
+                else if (adresseData.adgangsadresse?.id) {
+                    // Brug adgangsadresse ID som backup
+                    const adgUrl = `${API_BASE_URL}/adgangsadresser/${adresseData.adgangsadresse.id}`;
+                    const adgResponse = await fetch(adgUrl, {
+                        headers: {
+                            'Authorization': 'Basic ' + btoa(API_USERNAME + ':' + API_PASSWORD)
+                        }
+                    });
+                    if (adgResponse.ok) {
+                        const adgData = await adgResponse.json();
+                        console.log('Adgangsadresse data:', adgData);
+                        grundId = adgData.jordstykke?.id_lokalId;
+                    }
+                }
+
+                console.log('Grund ID:', grundId);
 
                 if (!grundId) {
                     throw new Error('Grund ID ikke fundet');
@@ -394,6 +417,7 @@
 
                 // Hent BBR data med grund ID
                 const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Grund=${grundId}`;
+                console.log('BBR URL:', bbrUrl);
                 const bbrResponse = await fetch(bbrUrl);
 
                 if (!bbrResponse.ok) {
@@ -401,6 +425,7 @@
                 }
 
                 const bbrData = await bbrResponse.json();
+                console.log('BBR data:', bbrData);
 
                 // Find boligareal fra BBR data
                 let boligAreal = null;
@@ -408,15 +433,17 @@
                 if (bbrData && Array.isArray(bbrData) && bbrData.length > 0) {
                     // Søg gennem bygninger for at finde boligareal
                     for (const bygning of bbrData) {
-                        if (bygning.samletBoligAreal_kvm) {
-                            boligAreal = bygning.samletBoligAreal_kvm;
-                            break;
-                        } else if (bygning.samletBygningsareal_kvm) {
-                            boligAreal = bygning.samletBygningsareal_kvm;
+                        console.log('Bygning:', bygning);
+                        // BBR API returnerer felter med byg-præfix
+                        if (bygning.byg038SamletBygningsareal) {
+                            boligAreal = bygning.byg038SamletBygningsareal;
+                            console.log('Fundet boligareal:', boligAreal);
                             break;
                         }
                     }
                 }
+
+                console.log('Endeligt boligareal:', boligAreal);
 
                 // Vis boligareal
                 const boligArealEl = document.getElementById('boligareal');
