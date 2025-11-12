@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dansk Adresse Opslag</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+        }
+
+        .search-wrapper {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .loading {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        @keyframes spin {
+            0% { transform: translateY(-50%) rotate(0deg); }
+            100% { transform: translateY(-50%) rotate(360deg); }
+        }
+
+        .suggestions {
+            position: relative;
+            margin-top: 5px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .suggestions.active {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 15px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.selected {
+            background: #f8f9ff;
+        }
+
+        .suggestion-main {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .suggestion-sub {
+            color: #999;
+            font-size: 0.85em;
+            margin-top: 4px;
+        }
+
+        .no-results {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+        }
+
+        .result-box {
+            margin-top: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border: 2px solid #667eea30;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result-box.active {
+            display: block;
+        }
+
+        .result-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .result-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-row:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #555;
+            min-width: 120px;
+        }
+
+        .result-value {
+            color: #333;
+        }
+
+        .error {
+            color: #e74c3c;
+            font-size: 0.9em;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #999;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏠 Adresse Opslag</h1>
+        <p class="subtitle">Søg efter en dansk adresse med autocomplete</p>
+
+        <div class="search-wrapper">
+            <label for="address-input">Søg adresse</label>
+            <div style="position: relative;">
+                <input
+                    type="text"
+                    id="address-input"
+                    placeholder="Indtast vejnavn, husnummer eller postnummer..."
+                    autocomplete="off"
+                >
+                <div class="loading" id="loading"></div>
+            </div>
+            <div class="error" id="error"></div>
+            <div class="suggestions" id="suggestions"></div>
+        </div>
+
+        <div class="result-box" id="result-box">
+            <div class="result-title">📍 Valgt adresse</div>
+            <div class="result-row">
+                <span class="result-label">Vejnavn:</span>
+                <span class="result-value" id="vejnavn">-</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">Husnummer:</span>
+                <span class="result-value" id="husnr">-</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">Postnummer:</span>
+                <span class="result-value" id="postnr">-</span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">By:</span>
+                <span class="result-value" id="by">-</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            Data fra Dataforsyningen API
+        </div>
+    </div>
+
+    <script>
+        // Konfiguration
+        const API_USERNAME = 'COKSIGWPKT';
+        const API_PASSWORD = 'CKode91!';
+        const API_BASE_URL = 'https://api.dataforsyningen.dk';
+
+        // DOM elementer
+        const input = document.getElementById('address-input');
+        const loading = document.getElementById('loading');
+        const suggestionsBox = document.getElementById('suggestions');
+        const resultBox = document.getElementById('result-box');
+        const errorEl = document.getElementById('error');
+
+        // State
+        let debounceTimer = null;
+        let selectedIndex = -1;
+        let currentSuggestions = [];
+
+        // Event listeners
+        input.addEventListener('input', handleInput);
+        input.addEventListener('keydown', handleKeydown);
+        document.addEventListener('click', handleClickOutside);
+
+        function handleInput(e) {
+            const query = e.target.value.trim();
+
+            if (query.length < 2) {
+                hideSuggestions();
+                return;
+            }
+
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => searchAddress(query), 300);
+        }
+
+        async function searchAddress(query) {
+            loading.classList.add('active');
+            errorEl.classList.remove('active');
+
+            try {
+                const url = `${API_BASE_URL}/autocomplete?q=${encodeURIComponent(query)}&type=adresse&fuzzy=true`;
+
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(API_USERNAME + ':' + API_PASSWORD)
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Kunne ikke hente data');
+                }
+
+                const data = await response.json();
+                currentSuggestions = data.slice(0, 10);
+                displaySuggestions(currentSuggestions);
+            } catch (error) {
+                console.error('Fejl:', error);
+                errorEl.textContent = 'Kunne ikke hente adresseforslag. Prøv igen.';
+                errorEl.classList.add('active');
+                hideSuggestions();
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        function displaySuggestions(suggestions) {
+            if (suggestions.length === 0) {
+                suggestionsBox.innerHTML = '<div class="no-results">Ingen adresser fundet</div>';
+                suggestionsBox.classList.add('active');
+                return;
+            }
+
+            suggestionsBox.innerHTML = suggestions.map((item, index) => `
+                <div class="suggestion-item" data-index="${index}" onclick="selectSuggestion(${index})">
+                    <div class="suggestion-main">${item.tekst}</div>
+                    ${item.forslagstekst !== item.tekst ? `<div class="suggestion-sub">${item.forslagstekst}</div>` : ''}
+                </div>
+            `).join('');
+
+            suggestionsBox.classList.add('active');
+            selectedIndex = -1;
+        }
+
+        function selectSuggestion(index) {
+            const suggestion = currentSuggestions[index];
+            if (!suggestion) return;
+
+            input.value = suggestion.tekst;
+            hideSuggestions();
+
+            if (suggestion.data) {
+                displayResult(suggestion.data);
+            }
+        }
+
+        function displayResult(data) {
+            document.getElementById('vejnavn').textContent = data.vejnavn || '-';
+            document.getElementById('husnr').textContent = data.husnr || '-';
+            document.getElementById('postnr').textContent = data.postnr || '-';
+            document.getElementById('by').textContent = data.postnrnavn || '-';
+            resultBox.classList.add('active');
+        }
+
+        function hideSuggestions() {
+            suggestionsBox.classList.remove('active');
+            suggestionsBox.innerHTML = '';
+            selectedIndex = -1;
+        }
+
+        function handleKeydown(e) {
+            const items = suggestionsBox.querySelectorAll('.suggestion-item');
+
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelectedItem(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelectedItem(items);
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                selectSuggestion(selectedIndex);
+            } else if (e.key === 'Escape') {
+                hideSuggestions();
+            }
+        }
+
+        function updateSelectedItem(items) {
+            items.forEach((item, index) => {
+                if (index === selectedIndex) {
+                    item.classList.add('selected');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
+
+        function handleClickOutside(e) {
+            if (!e.target.closest('.search-wrapper')) {
+                hideSuggestions();
+            }
+        }
+    </script>
+</body>
+</html>
