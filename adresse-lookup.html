@@ -181,6 +181,11 @@
             color: #333;
         }
 
+        .result-value.loading-text {
+            color: #999;
+            font-style: italic;
+        }
+
         .error {
             color: #e74c3c;
             font-size: 0.9em;
@@ -238,10 +243,14 @@
                 <span class="result-label">By:</span>
                 <span class="result-value" id="by">-</span>
             </div>
+            <div class="result-row">
+                <span class="result-label">Boligareal:</span>
+                <span class="result-value" id="boligareal">Henter...</span>
+            </div>
         </div>
 
         <div class="footer">
-            Data fra Dataforsyningen API
+            Data fra Dataforsyningen & BBR API
         </div>
     </div>
 
@@ -250,6 +259,7 @@
         const API_USERNAME = 'COKSIGWPKT';
         const API_PASSWORD = 'CKode91!';
         const API_BASE_URL = 'https://api.dataforsyningen.dk';
+        const BBR_BASE_URL = 'https://services.datafordeler.dk/BBR/BBRPublic/1/rest';
 
         // DOM elementer
         const input = document.getElementById('address-input');
@@ -328,7 +338,7 @@
             selectedIndex = -1;
         }
 
-        function selectSuggestion(index) {
+        async function selectSuggestion(index) {
             const suggestion = currentSuggestions[index];
             if (!suggestion) return;
 
@@ -336,16 +346,93 @@
             hideSuggestions();
 
             if (suggestion.data) {
-                displayResult(suggestion.data);
+                await displayResult(suggestion.data);
             }
         }
 
-        function displayResult(data) {
+        async function displayResult(data) {
+            // Vis adresse data
             document.getElementById('vejnavn').textContent = data.vejnavn || '-';
             document.getElementById('husnr').textContent = data.husnr || '-';
             document.getElementById('postnr').textContent = data.postnr || '-';
             document.getElementById('by').textContent = data.postnrnavn || '-';
+            document.getElementById('boligareal').textContent = 'Henter...';
+            document.getElementById('boligareal').classList.add('loading-text');
             resultBox.classList.add('active');
+
+            // Hent BBR data hvis vi har et adresse ID
+            if (data.id) {
+                await fetchBBRData(data.id);
+            } else {
+                document.getElementById('boligareal').textContent = 'Ikke tilgængeligt';
+                document.getElementById('boligareal').classList.remove('loading-text');
+            }
+        }
+
+        async function fetchBBRData(adresseId) {
+            try {
+                // Først hent adresse detaljer for at få grund ID
+                const adresseUrl = `${API_BASE_URL}/adresser/${adresseId}`;
+                const adresseResponse = await fetch(adresseUrl, {
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(API_USERNAME + ':' + API_PASSWORD)
+                    }
+                });
+
+                if (!adresseResponse.ok) {
+                    throw new Error('Kunne ikke hente adresse detaljer');
+                }
+
+                const adresseData = await adresseResponse.json();
+
+                // Hent grund ID fra adresse data
+                const grundId = adresseData.adgangsadresse?.jordstykke?.id_lokalId;
+
+                if (!grundId) {
+                    throw new Error('Grund ID ikke fundet');
+                }
+
+                // Hent BBR data med grund ID
+                const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Grund=${grundId}`;
+                const bbrResponse = await fetch(bbrUrl);
+
+                if (!bbrResponse.ok) {
+                    throw new Error('Kunne ikke hente BBR data');
+                }
+
+                const bbrData = await bbrResponse.json();
+
+                // Find boligareal fra BBR data
+                let boligAreal = null;
+
+                if (bbrData && Array.isArray(bbrData) && bbrData.length > 0) {
+                    // Søg gennem bygninger for at finde boligareal
+                    for (const bygning of bbrData) {
+                        if (bygning.samletBoligAreal_kvm) {
+                            boligAreal = bygning.samletBoligAreal_kvm;
+                            break;
+                        } else if (bygning.samletBygningsareal_kvm) {
+                            boligAreal = bygning.samletBygningsareal_kvm;
+                            break;
+                        }
+                    }
+                }
+
+                // Vis boligareal
+                const boligArealEl = document.getElementById('boligareal');
+                if (boligAreal) {
+                    boligArealEl.textContent = `${boligAreal} m²`;
+                } else {
+                    boligArealEl.textContent = 'Ikke tilgængeligt';
+                }
+                boligArealEl.classList.remove('loading-text');
+
+            } catch (error) {
+                console.error('Fejl ved hentning af BBR data:', error);
+                const boligArealEl = document.getElementById('boligareal');
+                boligArealEl.textContent = 'Kunne ikke hentes';
+                boligArealEl.classList.remove('loading-text');
+            }
         }
 
         function hideSuggestions() {
