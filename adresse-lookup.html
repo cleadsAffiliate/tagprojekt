@@ -374,7 +374,7 @@
                 console.log('=== START BBR DATA FETCH ===');
                 console.log('Adresse ID:', adresseId);
 
-                // Først hent adresse detaljer for at få grund ID
+                // Først hent adresse detaljer
                 const adresseUrl = `${API_BASE_URL}/adresser/${adresseId}`;
                 console.log('Henter fra URL:', adresseUrl);
 
@@ -384,114 +384,175 @@
                     }
                 });
 
-                console.log('Response status:', adresseResponse.status);
-
                 if (!adresseResponse.ok) {
-                    console.error('Fejl response:', await adresseResponse.text());
                     throw new Error(`Kunne ikke hente adresse detaljer (${adresseResponse.status})`);
                 }
 
                 const adresseData = await adresseResponse.json();
                 console.log('Adresse data modtaget');
 
-                // Prøv at hente grund ID fra jordstykke
-                let grundId = null;
-
-                // VIGTIGT: Altid hent jordstykke data fra href for at få korrekt grund ID
+                // Hent jordstykke data for at få BFE nummer og matrikel info
+                let jordstykkeData = null;
                 if (adresseData.adgangsadresse?.jordstykke?.href) {
                     console.log('Henter jordstykke data fra:', adresseData.adgangsadresse.jordstykke.href);
 
                     try {
-                        const jordstykkeUrl = adresseData.adgangsadresse.jordstykke.href;
-                        const jordstykkeResponse = await fetch(jordstykkeUrl, {
+                        const jordstykkeResponse = await fetch(adresseData.adgangsadresse.jordstykke.href, {
                             headers: {
                                 'Authorization': 'Basic ' + btoa(API_USERNAME + ':' + API_PASSWORD)
                             }
                         });
 
                         if (jordstykkeResponse.ok) {
-                            const jordstykkeData = await jordstykkeResponse.json();
-                            console.log('Jordstykke data:', jordstykkeData);
-
-                            // Prøv at finde id_lokalId i jordstykke data
-                            if (jordstykkeData.id_lokalId) {
-                                grundId = jordstykkeData.id_lokalId;
-                                console.log('✓ Grund ID fundet:', grundId);
-                            } else if (jordstykkeData.id) {
-                                grundId = jordstykkeData.id;
-                                console.log('✓ Grund ID fundet som "id":', grundId);
-                            } else {
-                                console.warn('⚠️ Jordstykke data mangler id_lokalId og id felter');
-                            }
-                        } else {
-                            console.error('Fejl ved hentning af jordstykke:', jordstykkeResponse.status);
+                            jordstykkeData = await jordstykkeResponse.json();
+                            console.log('📋 Jordstykke data:', JSON.stringify(jordstykkeData, null, 2));
                         }
                     } catch (error) {
                         console.error('Kunne ikke hente jordstykke data:', error);
                     }
-                } else {
-                    console.warn('⚠️ Ingen jordstykke href fundet i adresse data');
                 }
 
-                console.log('Endeligt Grund ID:', grundId);
+                // Nu prøver vi forskellige BBR API parametre i rækkefølge
+                let bbrData = null;
+                const adgangsadresseId = adresseData.adgangsadresse?.id;
 
-                // Fallback: Hvis vi ikke har grund ID, prøv med adgangsadresse ID
-                if (!grundId && adresseData.adgangsadresse?.id) {
-                    grundId = adresseData.adgangsadresse.id;
-                    console.log('⚠️ Bruger adgangsadresse ID som fallback:', grundId);
+                console.log('\n=== PRØVER BBR API MED FORSKELLIGE PARAMETRE ===');
+
+                // 1. Prøv med BFEnr (BFE nummer fra jordstykke)
+                if (jordstykkeData?.bfenummer && !bbrData) {
+                    console.log('\n🔍 Forsøg 1: BFEnr parameter');
+                    console.log('BFE nummer:', jordstykkeData.bfenummer);
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&BFEnr=${jordstykkeData.bfenummer}`;
+                    console.log('URL:', bbrUrl);
+
+                    try {
+                        const response = await fetch(bbrUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                bbrData = data;
+                                console.log('✅ SUCCESS med BFEnr! Fundet', data.length, 'bygning(er)');
+                            } else {
+                                console.log('❌ BFEnr returnerede tomt array');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Fejl ved BFEnr:', error);
+                    }
                 }
 
-                if (!grundId) {
-                    throw new Error('Hverken grund ID eller adgangsadresse ID kunne findes');
+                // 2. Prøv med SFEEjendomsnr (Ejendomsnummer fra jordstykke)
+                if (jordstykkeData?.sfeejendomsnr && !bbrData) {
+                    console.log('\n🔍 Forsøg 2: SFEEjendomsnr parameter');
+                    console.log('SFE Ejendomsnr:', jordstykkeData.sfeejendomsnr);
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&SFEEjendomsnr=${jordstykkeData.sfeejendomsnr}`;
+                    console.log('URL:', bbrUrl);
+
+                    try {
+                        const response = await fetch(bbrUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                bbrData = data;
+                                console.log('✅ SUCCESS med SFEEjendomsnr! Fundet', data.length, 'bygning(er)');
+                            } else {
+                                console.log('❌ SFEEjendomsnr returnerede tomt array');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Fejl ved SFEEjendomsnr:', error);
+                    }
                 }
 
-                // Hent BBR data med grund ID (eller adgangsadresse ID)
-                const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Grund=${grundId}`;
-                console.log('BBR URL:', bbrUrl);
-                const bbrResponse = await fetch(bbrUrl);
+                // 3. Prøv med HusnummerID (adgangsadresse ID)
+                if (adgangsadresseId && !bbrData) {
+                    console.log('\n🔍 Forsøg 3: HusnummerID parameter');
+                    console.log('Adgangsadresse ID:', adgangsadresseId);
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&HusnummerID=${adgangsadresseId}`;
+                    console.log('URL:', bbrUrl);
 
-                if (!bbrResponse.ok) {
-                    throw new Error('Kunne ikke hente BBR data');
+                    try {
+                        const response = await fetch(bbrUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                bbrData = data;
+                                console.log('✅ SUCCESS med HusnummerID! Fundet', data.length, 'bygning(er)');
+                            } else {
+                                console.log('❌ HusnummerID returnerede tomt array');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Fejl ved HusnummerID:', error);
+                    }
                 }
 
-                const bbrData = await bbrResponse.json();
-                console.log('BBR data:', bbrData);
+                // 4. Prøv med Matrikelnr + Ejerlavskode kombination
+                if (jordstykkeData?.matrikelnr && jordstykkeData?.ejerlav?.kode && !bbrData) {
+                    console.log('\n🔍 Forsøg 4: Matrikelnr + Ejerlavskode kombination');
+                    console.log('Matrikelnr:', jordstykkeData.matrikelnr);
+                    console.log('Ejerlavskode:', jordstykkeData.ejerlav.kode);
+                    const bbrUrl = `${BBR_BASE_URL}/bygning?username=${API_USERNAME}&password=${API_PASSWORD}&Format=JSON&Matrikelnr=${encodeURIComponent(jordstykkeData.matrikelnr)}&Ejerlavskode=${jordstykkeData.ejerlav.kode}`;
+                    console.log('URL:', bbrUrl);
+
+                    try {
+                        const response = await fetch(bbrUrl);
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (Array.isArray(data) && data.length > 0) {
+                                bbrData = data;
+                                console.log('✅ SUCCESS med Matrikelnr+Ejerlavskode! Fundet', data.length, 'bygning(er)');
+                            } else {
+                                console.log('❌ Matrikelnr+Ejerlavskode returnerede tomt array');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Fejl ved Matrikelnr+Ejerlavskode:', error);
+                    }
+                }
+
+                // Hvis ingen af metoderne virkede
+                if (!bbrData) {
+                    console.error('\n❌ INGEN BBR DATA KUNNE HENTES MED NOGEN AF METODERNE');
+                    throw new Error('Kunne ikke finde bygningsdata i BBR');
+                }
+
+                console.log('\n=== BBR DATA FUNDET ===');
+                console.log('Antal bygninger:', bbrData.length);
+                console.log('Fuld BBR data:', JSON.stringify(bbrData, null, 2));
 
                 // Find boligareal fra BBR data
                 let boligAreal = null;
 
-                if (bbrData && Array.isArray(bbrData) && bbrData.length > 0) {
-                    // Søg gennem bygninger for at finde boligareal
-                    for (const bygning of bbrData) {
-                        console.log('Bygning:', bygning);
-                        // BBR API returnerer felter med byg-præfix
-                        if (bygning.byg038SamletBygningsareal) {
-                            boligAreal = bygning.byg038SamletBygningsareal;
-                            console.log('Fundet boligareal:', boligAreal);
-                            break;
-                        }
+                for (const bygning of bbrData) {
+                    // BBR API returnerer felter med byg-præfix
+                    if (bygning.byg038SamletBygningsareal) {
+                        boligAreal = bygning.byg038SamletBygningsareal;
+                        console.log('✅ Fundet boligareal:', boligAreal, 'm²');
+                        break;
                     }
                 }
 
-                console.log('Endeligt boligareal:', boligAreal);
+                if (!boligAreal) {
+                    console.warn('⚠️ BBR data fundet, men ingen byg038SamletBygningsareal felt');
+                    console.log('Tilgængelige felter i første bygning:', Object.keys(bbrData[0]));
+                }
 
                 // Vis boligareal
                 const boligArealEl = document.getElementById('boligareal');
                 if (boligAreal) {
                     boligArealEl.textContent = `${boligAreal} m²`;
                 } else {
-                    boligArealEl.textContent = 'Ikke tilgængeligt';
+                    boligArealEl.textContent = 'Ikke tilgængeligt i BBR data';
                 }
                 boligArealEl.classList.remove('loading-text');
 
             } catch (error) {
-                console.error('=== FEJL VED HENTNING AF BBR DATA ===');
-                console.error('Fejl type:', error.name);
-                console.error('Fejl besked:', error.message);
-                console.error('Fuld fejl:', error);
+                console.error('\n=== FEJL VED HENTNING AF BBR DATA ===');
+                console.error('Fejl:', error);
 
                 const boligArealEl = document.getElementById('boligareal');
-                boligArealEl.textContent = 'Kunne ikke hentes (se console for detaljer)';
+                boligArealEl.textContent = 'Kunne ikke hentes (se console)';
                 boligArealEl.classList.remove('loading-text');
             }
         }
