@@ -2,6 +2,8 @@
 
 Et JavaScript plugin til adresse autocomplete med automatisk hentning af BBR data (boligareal og tagmateriale).
 
+**🎯 Tilgængelig som WordPress Plugin!** Se [INSTALLATION.md](INSTALLATION.md) for WordPress installation.
+
 ## Funktionalitet
 
 - Autocomplete adressesøgning via DAWA API
@@ -9,14 +11,31 @@ Et JavaScript plugin til adresse autocomplete med automatisk hentning af BBR dat
 - Viser boligareal og tagmateriale
 - Auto-submit efter 2 sekunders inaktivitet (ved 10+ karakterer)
 - Videresender til `/beregner/[URL-encoded-adresse]`
+- **WordPress plugin** med admin indstillinger og shortcode support
 
-## Filer
+## Projektstruktur
 
+### WordPress Plugin (Anbefalet)
+- `address-lookup-bbr/` - Komplet WordPress plugin
+- `address-lookup-bbr.zip` - Klar til upload i WordPress
+- Se [INSTALLATION.md](INSTALLATION.md) for installation
+
+### Standalone Filer
 - `index.html` - HTML struktur
 - `styles.css` - Styling
 - `address-autocomplete.js` - Plugin logik
 
-## Brug som Plugin
+## Hurtigstart - WordPress
+
+1. Download `address-lookup-bbr.zip`
+2. Upload til WordPress via Plugins > Tilføj ny > Upload Plugin
+3. Aktiver pluginnet
+4. Gå til Indstillinger > Adresse Lookup og konfigurer
+5. Indsæt `[address_lookup]` på en side
+
+Se [INSTALLATION.md](INSTALLATION.md) for detaljeret vejledning.
+
+## Brug som Standalone Plugin
 
 ### Metode 1: Direkte inkludering
 
