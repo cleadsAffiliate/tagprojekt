@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adresse Lookup med BBR</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="roof-search">
+        <div class="search-container">
+            <h2>Søg din adresse</h2>
+            <div class="input-wrapper">
+                <input
+                    type="text"
+                    id="dawa-autocomplete1"
+                    class="address1"
+                    placeholder="Indtast adresse..."
+                    autocomplete="off"
+                />
+                <button id="search-roof1" class="disabled">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <ul class="autocomplete1"></ul>
+
+            <!-- BBR Data Display -->
+            <div id="bbr-info" class="bbr-info hidden">
+                <h3>BBR Oplysninger</h3>
+                <div class="bbr-data">
+                    <div class="bbr-item">
+                        <span class="bbr-label">Boligareal:</span>
+                        <span id="bbr-boligareal" class="bbr-value">-</span>
+                    </div>
+                    <div class="bbr-item">
+                        <span class="bbr-label">Tagmateriale:</span>
+                        <span id="bbr-tagmateriale" class="bbr-value">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="address-autocomplete.js"></script>
+</body>
+</html>
